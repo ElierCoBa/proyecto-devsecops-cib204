@@ -1,6 +1,6 @@
 // ============================================================================
-//  db.js  -  Acceso a datos (bitacora de operaciones)
-//  >>> VERSION SEGURA (Consultas parametrizadas) <<<
+//   db.js  -  Acceso a datos (bitacora de operaciones)
+//   >>> VERSION SEGURA (Consultas parametrizadas y manejo robusto de errores) <<<
 // ============================================================================
 
 const mysql = require('mysql2');
@@ -13,7 +13,7 @@ try {
   conexion = null;
 }
 
-// [CORREGIDO] Inyección SQL prevenida mediante placeholders (?)
+// [CORREGIDO] Inyección SQL prevenida mediante placeholders (?) y ocultamiento de errores internos
 function buscarBitacora(nombre, callback) {
   const sql = 'SELECT * FROM bitacora WHERE usuario = ?';
   if (!conexion) {
@@ -21,7 +21,8 @@ function buscarBitacora(nombre, callback) {
   }
   conexion.query(sql, [nombre], function (err, filas) {
     if (err) {
-      return callback(null, { sqlEjecutado: sql, filas: [], nota: err.code });
+      // Se evita retornar el código de error crudo de la base de datos al cliente
+      return callback(err, { sqlEjecutado: sql, filas: [] });
     }
     return callback(null, { sqlEjecutado: sql, filas: filas });
   });

@@ -1,45 +1,37 @@
 // ============================================================================
-//  auth.js  -  Gestion de identidad y acceso (IAM)
-//  >>> VERSION INSEGURA <<<
+//   auth.js  -  Gestion de identidad y acceso (IAM)
+//   >>> VERSION SEGURA (Validación JWKS / RS256) <<<
 // ============================================================================
-//
-//  Middleware que deberia exigir un token JWT valido emitido por Keycloak.
-//  En esta version esta debilitado a proposito.
 
-const jwt = require('jsonwebtoken');
+const { expressjwt } = require('express-jwt');
+const jwksRsa = require('jwks-rsa');
 const config = require('./config');
 
-// [VULN-4] Verificacion de JWT insegura.
-//   - No se valida la firma con la llave publica de Keycloak.
-//   - Se acepta el algoritmo 'none' y se decodifica sin verificar.
-//   - El secreto de respaldo esta quemado (config.JWT_SECRET).
-//   Un atacante puede fabricar un token con alg=none y entrar.
-//   La solucion es validar la firma contra el JWKS del emisor y restringir
-//   los algoritmos permitidos (RS256).
-//   CWE-347 (Improper Verification of Cryptographic Signature) / CWE-287
+// Configuración del middleware de validación contra el JWKS de Keycloak
+const checkJwt = expressjwt({
+  secret: jwksRsa.expressJwtSecret({
+    cache: true,
+    rateLimit: true,
+    jwksRequestsPerMinute: 5,
+    jwksUri: config.JWKS_URI || `${config.KEYCLOAK_URL}/realms/${config.KEYCLOAK_REALM}/protocol/openid-connect/certs`
+  }),
+  issuer: config.KEYCLOAK_ISSUER || `${config.KEYCLOAK_URL}/realms/${config.KEYCLOAK_REALM}`,
+  algorithms: ['RS256']
+});
 
 function requiereAuth(req, res, next) {
-  // Si el control de acceso esta apagado, deja pasar a cualquiera.
+  // Si el control de acceso está apagado, deja pasar (útil para entornos de pruebas locales específicos)
   if (!config.AUTH_ENABLED) {
     return next();
   }
 
-  const cabecera = req.headers['authorization'] || '';
-  const token = cabecera.replace('Bearer ', '');
-
-  if (!token) {
-    return res.status(401).json({ error: 'No autorizado' });
-  }
-
-  try {
-    // INSEGURO: decodifica sin verificar la firma y admite 'none'.
-    const payload = jwt.decode(token) ||
-      jwt.verify(token, config.JWT_SECRET, { algorithms: ['none', 'HS256'] });
-    req.usuario = payload;
+  // Ejecuta la validación del token JWT mediante JWKS
+  checkJwt(req, res, (err) => {
+    if (err) {
+      return res.status(401).json({ error: 'No autorizado o token inválido' });
+    }
     return next();
-  } catch (e) {
-    return res.status(401).json({ error: 'No autorizado' });
-  }
+  });
 }
 
 module.exports = { requiereAuth };
