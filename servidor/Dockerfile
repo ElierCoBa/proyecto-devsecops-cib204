@@ -1,21 +1,23 @@
 # ============================================================================
 #   Dockerfile  -  Servicio de cifrado
-#   >>> VERSION SEGURA (Multi-stage build & Usuario sin privilegios) <<<
+#   >>> VERSION SEGURA Y PARCHEADA (Multi-stage build & Usuario sin privilegios) <<<
 # ============================================================================
 
 # Etapa 1: Construcción y preparación de dependencias
 FROM node:20-slim AS build
 WORKDIR /app
 COPY package*.json ./
-
-# Nota: Si tu proyecto no incluye package-lock.json, cambia 'npm ci' por 'npm install'
 RUN npm ci --omit=dev
-
 COPY *.js ./
 
 # Etapa 2: Imagen final de producción ligera y segura
 FROM node:20-slim
 WORKDIR /app
+
+# Actualizar los paquetes del sistema operativo para solucionar las vulnerabilidades de Debian
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Crear un usuario del sistema sin privilegios (Mitigación CWE-250)
 RUN useradd --system --no-create-home appuser
