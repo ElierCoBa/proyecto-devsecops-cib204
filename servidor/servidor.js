@@ -20,12 +20,8 @@ app.use(express.json());
 // Cabeceras de seguridad con Helmet (CWE-693)
 app.use(helmet());
 
-// [CORREGIDO] CORS restringido mediante configuración o variable de entorno (CWE-942)
-const corsOptions = {
-  origin: config.CORS_ORIGIN || 'http://localhost:3000',
-  optionsSuccessStatus: 200
-};
-app.use(cors(corsOptions));
+// [CORREGIDO] CORS restringido utilizando el origen permitido del archivo de configuración
+app.use(cors({ origin: config.ORIGEN_PERMITIDO }));
 
 // [NUEVO] Rate Limiting para prevenir ataques de fuerza bruta o DoS (CWE-307)
 const limiter = rateLimit({
@@ -51,9 +47,9 @@ app.get('/llave', (req, res) => {
 app.post('/cifrar', requiereAuth, (req, res) => {
   try {
     const texto = req.body.texto;
-    // Validación de entrada (CWE-20)
-    if (typeof texto !== 'string' || texto.length === 0 || texto.length > 10000) {
-      return res.status(400).json({ error: 'Texto invalido o excede el tamano permitido' });
+    // [CORREGIDO] Validación estricta de entrada: texto de 1 a 180 caracteres (CWE-20)
+    if (typeof texto !== 'string' || texto.length < 1 || texto.length > 180) {
+      return res.status(400).json({ error: 'Texto invalido o excede el tamano permitido (1-180 caracteres)' });
     }
     const resultado = cifrado.cifrar(texto, llaves.publicKey);
     res.json({ cifrado: resultado });
