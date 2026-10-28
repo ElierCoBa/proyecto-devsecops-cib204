@@ -7,7 +7,10 @@
 FROM node:20-slim AS build
 WORKDIR /app
 COPY package*.json ./
+
+# Nota: Si tu proyecto no incluye package-lock.json, cambia 'npm ci' por 'npm install'
 RUN npm ci --omit=dev
+
 COPY *.js ./
 
 # Etapa 2: Imagen final de producción ligera y segura
